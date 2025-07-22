@@ -1,0 +1,45 @@
+{
+  "name": "jc-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite --config vite.config.ts --host",
+    "preview": "vite preview",
+    "build": "run-p type-check \"build-only {@}\" --",
+    "build-only": "vite build",
+    "deploy": "npm run build && gh-pages -d dist",
+    "type-check": "vue-tsc --build",
+    "format": "prettier --write src/",
+    "start": "npm run build-only && electron .",
+    "start-only": "electron .",
+    "packager": "npm run build && electron-packager . distApp --ignore='/node_modules' --ignore='/src' --ignore='/public' --ignore='/.idea' --ignore='/.vscode' --ignore='/.gitattributes' --ignore='/.gitignore' --ignore='/README.md' --ignore='/pnpm-lock.yaml' --ignore='/.prettierrc.json' --ignore='/.npmrc' --ignore='/preload.js' --ignore='tsconfig.app.json' --ignore='tsconfig.node.json' --ignore='tsconfig.json' --ignore='/*.d.ts' --ignore='/vite.config.ts' --overwrite",
+    "packager-only": "electron-packager . distApp --ignore='/node_modules' --ignore='/src' --ignore='/public' --ignore='/.idea' --ignore='/.vscode' --ignore='/.gitattributes' --ignore='/.gitignore' --ignore='/README.md' --ignore='/pnpm-lock.yaml' --ignore='/.prettierrc.json' --ignore='/.npmrc' --ignore='/preload.js' --ignore='tsconfig.app.json' --ignore='tsconfig.node.json' --ignore='tsconfig.json' --ignore='/*.d.ts' --ignore='/vite.config.ts' --overwrite"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "element-plus": "^2.10.3",
+    "gh-pages": "^6.3.0",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.17",
+    "vue-cropper": "^1.1.4",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.2",
+    "@types/node": "^22.15.32",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "@vue/tsconfig": "^0.7.0",
+    "electron": "^37.2.1",
+    "electron-packager": "^17.1.2",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "3.5.3",
+    "typescript": "~5.8.0",
+    "unplugin-auto-import": "^19.3.0",
+    "unplugin-vue-components": "^28.8.0",
+    "vite": "^7.0.0",
+    "vite-plugin-vue-devtools": "^7.7.7",
+    "vue-tsc": "^2.2.10"
+  }
+}
