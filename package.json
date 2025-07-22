@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "build": "run-p type-check \"build-only {@}\" --",
     "build-only": "vite build",
-    "deploy": "npm run build && gh-pages -d dist",
+    "deploy": "npm run build && gh-pages -d docs",
     "gh": "gh-pages -d dist",
     "type-check": "vue-tsc --build",
     "format": "prettier --write src/",
