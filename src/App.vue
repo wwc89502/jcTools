@@ -1,35 +1,37 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { ref } from 'vue'
+import { useRoute, RouterView } from 'vue-router'
+
+const route = useRoute()
+const font = ref({
+  color: 'rgba(0, 0, 0, .15)',
+})
 </script>
 
 <template>
   <div class="tabs">
-    <router-link to="/cropper">单图转换格式/压缩/裁剪</router-link>
-    <router-link to="/transformer">批量转换格式/压缩</router-link>
+    <el-menu router mode="horizontal" :default-active="route.path">
+      <el-menu-item index="/cropper">单图转换格式/压缩/裁剪</el-menu-item>
+      <el-menu-item index="/transformer">多图批量转换格式/压缩</el-menu-item>
+    </el-menu>
   </div>
-  <RouterView />
+  <el-watermark :font="font" content="jcTools">
+    <div class="layout">
+      <RouterView />
+    </div>
+  </el-watermark>
 </template>
 
 <style scoped>
 .tabs {
-  padding: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  background: #eee;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 999;
 }
-.tabs a {
-  text-decoration: none;
-  color: var(--el-color-primary);
-  transition: 0.4s;
-  padding: 2px 8px;
-  margin: 0 4px;
-  font-size: 16px;
-  border-radius: 4px;
-}
-.tabs a.router-link-active {
-  background: var(--el-color-primary);
-  color: #fff;
+.layout{
+  min-height: 100vh;
+  padding-top: 60px;
 }
 </style>

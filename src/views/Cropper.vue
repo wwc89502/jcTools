@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ref } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
@@ -85,7 +85,6 @@ const saveImage = () => {
   })
 }
 const realTime = (e: any) => {
-  console.log(e)
 }
 </script>
 
