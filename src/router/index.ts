@@ -20,6 +20,11 @@ const router = createRouter({
       name: 'transformer',
       component: () => import('../views/Transformer.vue'),
     },
+    {
+      path: '/cll',
+      name: 'cll',
+      component: () => import('../views/Cll.vue'),
+    },
   ],
 })
 
