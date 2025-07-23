@@ -11,7 +11,6 @@ export const useGlobalStore = defineStore('global', () => {
 },
   {
     persist: {
-      enable: true,
       storage: sessionStorage
     }
   })
