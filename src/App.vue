@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import FoodsDb from '@/db/foods-db.ts'
 import UserFoodsDb from '@/db/user-foods-db.ts'
 import { foods, userFoods } from '@/db/dbData'
 import { useGlobalStore } from '@/stores'
 import { useRoute, RouterView } from 'vue-router'
+import { decryptedSM4 } from '@/utils/sm4.ts'
 
 const globalStore = useGlobalStore()
 const route = useRoute()
@@ -27,18 +28,24 @@ const publicMenu = ref([
 
 const privateMenu = ref([
   { path: '/cll', title: '生成周食谱' },
+  { path: '/pwdList', title: '密码库' },
 ])
 
 const checkUser = () => {
   ElMessageBox.prompt('输入验证码', {
   }).then(({ value }) => {
-    if (value === 'jc8866') {
+    if (decryptedSM4('8deecbc38f8250adc39387a274852e11', value + '123456789abc98741236') === 'jc8866') {
       globalStore.setPassword(value)
     } else {
       ElMessage.error('输入有误')
     }
   })
 }
+
+const showAuthMenu = computed(() => {
+  if (!globalStore.password) return false
+  return decryptedSM4('8deecbc38f8250adc39387a274852e11', globalStore.password + '123456789abc98741236') === 'jc8866'
+})
 
 onMounted(() => {
   initDB()
@@ -49,7 +56,7 @@ onMounted(() => {
   <div class="tabs">
     <el-menu router mode="horizontal" :default-active="route.path">
       <el-menu-item v-for="item in publicMenu" :index="item.path" :key="item.path">{{ item.title }}</el-menu-item>
-      <template v-if="globalStore.password === 'jc8866'">
+      <template v-if="showAuthMenu">
         <el-menu-item v-for="item in privateMenu" :index="item.path" :key="item.path">{{ item.title }}</el-menu-item>
       </template>
       <el-menu-item v-else @click="checkUser">自用</el-menu-item>

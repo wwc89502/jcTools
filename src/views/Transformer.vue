@@ -85,7 +85,7 @@ const compressAll = async () => {
 
   try {
     for (const file of files.value) {
-      if (file.status === 'done') continue
+      // if (file.status === 'done') continue
 
       file.status = 'compressing'
       try {
@@ -195,7 +195,7 @@ const getStatusType = (status: string) => {
               :value="item"
             ></el-option>
           </el-select>
-          <el-button @click="resetFiles">重新选择</el-button>
+          <el-button :disabled="compressing" @click="resetFiles">重新选择</el-button>
           <el-button
             type="success"
             @click="downloadAll"
