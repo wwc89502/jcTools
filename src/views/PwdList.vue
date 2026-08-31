@@ -2,6 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { decryptedSM4, encryptSM4 } from '@/utils/sm4.ts'
 import { copyText } from '@/utils'
+import { useGlobalStore } from '@/stores'
+const globalStore = useGlobalStore()
 const pwdList = [
   {
     "name": "yh用户端",
@@ -154,25 +156,24 @@ const de = () => {
 
 const deRow = (row) => {
   copyText(`
-  name: ${row.name}
-  account: ${decryptedSM4(row.enAccount, sm4Form.value.key + '123456789abc98741236')}
-  password: ${decryptedSM4(row.enPassword, sm4Form.value.key + '123456789abc98741236')}
-  password2: ${decryptedSM4(row.enPassword2, sm4Form.value.key + '123456789abc98741236')}
+name: ${row.name}
+account: ${decryptedSM4(row.enAccount, sm4Form.value.key + '123456789abc98741236')}
+password: ${decryptedSM4(row.enPassword, sm4Form.value.key + '123456789abc98741236')}
+password2: ${decryptedSM4(row.enPassword2, sm4Form.value.key + '123456789abc98741236')}
   `)
 }
 
-const enList = () => {
-  const key = '' + '123456789abc98741236'
+const enList = (key = '') => {
   return pwdList.map((item) => ({
     name: item.name,
-    enAccount: encryptSM4(item.enAccount, key),
-    enPassword: encryptSM4(item.enPassword, key),
-    enPassword2: encryptSM4(item.enPassword2, key),
+    enAccount: encryptSM4(item.enAccount, key + '123456789abc98741236'),
+    enPassword: encryptSM4(item.enPassword, key + '123456789abc98741236'),
+    enPassword2: encryptSM4(item.enPassword2, key + '123456789abc98741236'),
   }))
 }
 
 onMounted(() => {
-  // console.log(enList())
+  // console.log(enList(globalStore.password))
 })
 </script>
 

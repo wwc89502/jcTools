@@ -23,6 +23,7 @@ const initDB = async () => {
 
 const publicMenu = ref([
   { path: '/cropper', title: '单图转换格式/压缩/裁剪' },
+  // { path: '/cropper2', title: '单图转换格式/压缩/裁剪2.0' },
   { path: '/transformer', title: '多图批量转换格式/压缩' },
 ])
 

@@ -5,10 +5,9 @@ import { ElMessage } from 'element-plus'
 
 const option = ref({
   img: '',
-  outputSize: 90,
+  outputSize: 92,
   autoCropWidth: 10,
   autoCropHeight: 10,
-  enlarge: 1,
   outputType: '',
   info: true,
   canScale: true,
@@ -20,6 +19,7 @@ const option = ref({
   maxImgSize: '10000',
 })
 const typeList = ['jpeg', 'png', 'webp']
+const lockRatio = ref(false)
 const crop = ref()
 const cropper = ref()
 const fileName = ref('')
@@ -61,16 +61,8 @@ const handleFilesChange = async (file: any) => {
   option.value.img = img.url
   option.value.outputType = img.outputType
   fileName.value = img.fileName
-  let enlarge = 0
-  if (crop.value.offsetHeight / crop.value.offsetWidth > img.height / img.width) {
-    enlarge = crop.value.offsetWidth / img.width
-  } else {
-    enlarge = crop.value.offsetHeight / img.height
-  }
-  if (enlarge > 1) enlarge = 1
-  option.value.enlarge = 1 / enlarge
-  option.value.autoCropWidth = img.width * enlarge
-  option.value.autoCropHeight = img.height * enlarge
+  option.value.autoCropWidth = img.width
+  option.value.autoCropHeight = img.height
 }
 const saveImage = () => {
   cropper.value.getCropBlob((data: Blob) => {
@@ -83,6 +75,14 @@ const saveImage = () => {
     link.href = URL.createObjectURL(data)
     link.click()
   })
+}
+const lockRatioChange = (e) => {
+  console.log(e)
+  if (e) {
+    option.value.infoTrue = false
+  } else {
+    option.value.infoTrue = true
+  }
 }
 const realTime = (e: any) => {
 }
@@ -116,13 +116,8 @@ const realTime = (e: any) => {
           ></el-input-number>
         </div>
       </el-form-item>
-      <el-form-item label="输出比例倍数">
-        <el-input-number
-          style="width: 100px"
-          :disabled="!option.img"
-          controls-position="right"
-          v-model="option.enlarge"
-        ></el-input-number>
+      <el-form-item label="">
+        <el-checkbox v-model="lockRatio" @change="lockRatioChange">固定尺寸</el-checkbox>
       </el-form-item>
       <el-form-item :label="`压缩质量 (${option.outputSize}%)`">
         <el-slider
