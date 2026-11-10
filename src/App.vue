@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRoute, RouterView } from 'vue-router'
 import { InfoFilled } from '@element-plus/icons-vue'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 const route = useRoute()
 const font = ref({
@@ -20,6 +21,7 @@ const publicMenu = ref([
 </script>
 
 <template>
+  <el-config-provider :locale="zhCn">
   <div class="tabs">
     <el-menu router mode="horizontal" :default-active="route.path">
       <el-menu-item v-for="item in publicMenu" :index="item.path" :key="item.path">{{ item.title }}</el-menu-item>
@@ -65,6 +67,7 @@ const publicMenu = ref([
       <RouterView />
     </div>
   </el-watermark>
+  </el-config-provider>
 </template>
 
 <style scoped>

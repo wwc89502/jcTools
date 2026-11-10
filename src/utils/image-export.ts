@@ -2,14 +2,29 @@ export type ImageOutputType = 'image/jpeg' | 'image/png' | 'image/webp'
 
 export const imageOutputTypes: ImageOutputType[] = ['image/jpeg', 'image/png', 'image/webp']
 
-export const loadImage = (file: File) => {
+export const isSupportedImageFile = (file: File) =>
+  file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name)
+
+export const loadImage = async (file: File) => {
+  let imageBlob: Blob = file
+  if (/\.(heic|heif)$/i.test(file.name) || /^image\/hei[cf]/i.test(file.type)) {
+    try {
+      const { heicTo, isHeic } = await import('heic-to/csp')
+      if (await isHeic(file)) {
+        imageBlob = await heicTo({ blob: file, type: 'image/png' })
+      }
+    } catch {
+      throw new Error('HEIC/HEIF 图片解码失败，请确认文件有效后重试')
+    }
+  }
+
   return new Promise<{ file: File; image: HTMLImageElement; url: string }>((resolve, reject) => {
-    const url = URL.createObjectURL(file)
+    const url = URL.createObjectURL(imageBlob)
     const image = new Image()
     image.onload = () => resolve({ file, image, url })
     image.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error('图片加载失败'))
+      reject(new Error('浏览器无法解码此图片格式'))
     }
     image.src = url
   })

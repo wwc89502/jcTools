@@ -13,9 +13,12 @@ import {
   UploadFilled,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import type { UploadFile } from 'element-plus'
+import AspectRatioToggle from './AspectRatioToggle.vue'
 import {
   canvasToBlob,
   downloadBlob,
+  isSupportedImageFile,
   imageOutputTypes,
   loadImage,
   replaceExtension,
@@ -23,6 +26,7 @@ import {
 } from '@/utils/image-export'
 
 const props = defineProps<{ mode: 'canvas' | 'image' }>()
+const MAX_CANVAS_PIXELS = 40_000_000
 
 const sourceFile = ref<File>()
 const sourceImage = ref<HTMLImageElement>()
@@ -33,6 +37,12 @@ const quality = ref(90)
 const outputType = ref<ImageOutputType>('image/jpeg')
 const processing = ref(false)
 const previewCanvas = ref<HTMLCanvasElement>()
+const aspectRatioLocked = ref(true)
+const canvasAspectRatio = ref(1)
+const imageAspectRatioLocked = ref(true)
+const imageAspectRatio = ref(1)
+const showOriginalPreview = ref(false)
+const constrainImageToCanvas = ref(false)
 const canvasAlignment = ref('center')
 const imageWidth = ref(0)
 const imageHeight = ref(0)
@@ -63,11 +73,24 @@ const previewScale = computed(() => {
   return Math.min(1, 720 / width.value, 480 / height.value)
 })
 const previewScaleLabel = computed(() => `${Math.round(previewScale.value * 100)}%`)
+const qualityDisabled = computed(() => outputType.value === 'image/png')
+const jpegTransparencyHint = computed(() => outputType.value === 'image/jpeg' && !!sourceImage.value)
+const aspectRatio = computed(() =>
+  sourceImage.value?.naturalWidth && sourceImage.value?.naturalHeight
+    ? sourceImage.value.naturalWidth / sourceImage.value.naturalHeight
+    : 1,
+)
+const isCanvasTooLarge = computed(() => width.value * height.value > MAX_CANVAS_PIXELS)
 const currentAlignmentLabel = computed(() =>
   canvasAlignment.value === 'custom'
     ? '自定义拖拽'
     : alignmentOptions.find((option) => option.value === canvasAlignment.value)?.label,
 )
+
+const getOutputType = (fileType: string): ImageOutputType =>
+  imageOutputTypes.includes(fileType as ImageOutputType)
+    ? (fileType as ImageOutputType)
+    : 'image/jpeg'
 
 const getCanvasImageSize = () => ({
   width: props.mode === 'canvas' ? imageWidth.value : width.value,
@@ -93,6 +116,26 @@ const getImagePlacement = () => {
   }
 }
 
+const clampImagePosition = (position: { x: number; y: number }) => {
+  const imageSize = getCanvasImageSize()
+  if (constrainImageToCanvas.value) {
+    return {
+      x:
+        imageSize.width >= width.value
+          ? 0
+          : Math.round(Math.min(width.value - imageSize.width, Math.max(0, position.x))),
+      y:
+        imageSize.height >= height.value
+          ? 0
+          : Math.round(Math.min(height.value - imageSize.height, Math.max(0, position.y))),
+    }
+  }
+  return {
+    x: Math.round(Math.min(width.value - 1, Math.max(1 - imageSize.width, position.x))),
+    y: Math.round(Math.min(height.value - 1, Math.max(1 - imageSize.height, position.y))),
+  }
+}
+
 const syncAlignmentPosition = () => {
   if (props.mode !== 'canvas' || canvasAlignment.value === 'custom') return
   const imageSize = getCanvasImageSize()
@@ -105,6 +148,55 @@ const syncAlignmentPosition = () => {
 const selectAlignment = (value: string) => {
   canvasAlignment.value = value
   syncAlignmentPosition()
+}
+
+const handleDimensionChange = (
+  axis: 'width' | 'height',
+  value: number | null | undefined,
+) => {
+  if (!aspectRatioLocked.value || !sourceImage.value) return
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue) || numericValue < 1) return
+  const ratio = props.mode === 'canvas' ? canvasAspectRatio.value : aspectRatio.value
+  if (axis === 'width') {
+    height.value = Math.max(1, Math.round(numericValue / ratio))
+  } else {
+    width.value = Math.max(1, Math.round(numericValue * ratio))
+  }
+}
+
+const toggleAspectRatio = (value: boolean | string | number) => {
+  if (value && props.mode === 'canvas') canvasAspectRatio.value = width.value / height.value
+  aspectRatioLocked.value = Boolean(value)
+  if (aspectRatioLocked.value) handleDimensionChange('width', width.value)
+}
+
+const handleImageDimensionChange = (
+  axis: 'width' | 'height',
+  value: number | null | undefined,
+) => {
+  if (!imageAspectRatioLocked.value || !sourceImage.value) return
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue) || numericValue < 1) return
+  if (axis === 'width') {
+    imageHeight.value = Math.max(1, Math.round(numericValue / imageAspectRatio.value))
+  } else {
+    imageWidth.value = Math.max(1, Math.round(numericValue * imageAspectRatio.value))
+  }
+}
+
+const toggleImageAspectRatio = (value: boolean) => {
+  if (value) imageAspectRatio.value = imageWidth.value / imageHeight.value
+  imageAspectRatioLocked.value = value
+}
+
+const normalizeCustomPosition = () => {
+  imagePosition.value = clampImagePosition(imagePosition.value)
+}
+
+const toggleCanvasBounds = (value: boolean | string | number) => {
+  constrainImageToCanvas.value = Boolean(value)
+  normalizeCustomPosition()
 }
 
 const drawPreview = async () => {
@@ -142,29 +234,39 @@ const drawPreview = async () => {
   }
 }
 
-const handleFileChange = async (uploadFile: any) => {
+const handleFileChange = async (uploadFile: UploadFile) => {
   const file = uploadFile.raw as File | undefined
   if (!file) return
-  if (!file.type.startsWith('image/')) {
+  if (!isSupportedImageFile(file)) {
     ElMessage.error('请选择图片文件')
     return
   }
 
   try {
+    if (file.type === 'image/gif' || /\.gif$/i.test(file.name)) {
+      ElMessage.warning('GIF 动图会按首帧处理，导出后不保留动画')
+    }
     const loaded = await loadImage(file)
     if (sourceUrl.value) URL.revokeObjectURL(sourceUrl.value)
     sourceFile.value = loaded.file
     sourceImage.value = loaded.image
     sourceUrl.value = loaded.url
+    outputType.value = getOutputType(loaded.file.type)
     width.value = loaded.image.naturalWidth
     height.value = loaded.image.naturalHeight
     imageWidth.value = loaded.image.naturalWidth
     imageHeight.value = loaded.image.naturalHeight
+    aspectRatioLocked.value = true
+    canvasAspectRatio.value = loaded.image.naturalWidth / loaded.image.naturalHeight
+    imageAspectRatioLocked.value = true
+    imageAspectRatio.value = canvasAspectRatio.value
+    showOriginalPreview.value = false
+    constrainImageToCanvas.value = false
     canvasAlignment.value = 'center'
     syncAlignmentPosition()
     drawPreview()
-  } catch (error: any) {
-    ElMessage.error(error.message || '图片加载失败')
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '图片加载失败')
   }
 }
 
@@ -179,17 +281,30 @@ const reset = () => {
   imageHeight.value = 0
   imagePosition.value = { x: 0, y: 0 }
   dragState.value = undefined
+  aspectRatioLocked.value = true
+  canvasAspectRatio.value = 1
+  imageAspectRatioLocked.value = true
+  imageAspectRatio.value = 1
+  showOriginalPreview.value = false
+  constrainImageToCanvas.value = false
 }
 
 watch(
   [sourceImage, width, height, imageWidth, imageHeight, canvasAlignment, outputType],
   () => {
     syncAlignmentPosition()
+    if (imageWidth.value > width.value || imageHeight.value > height.value) {
+      constrainImageToCanvas.value = false
+    }
+    if (props.mode === 'canvas' && canvasAlignment.value === 'custom') {
+      normalizeCustomPosition()
+    }
     drawPreview()
   },
   { flush: 'post' },
 )
 watch(imagePosition, () => drawPreview(), { deep: true, flush: 'post' })
+watch(showOriginalPreview, () => drawPreview(), { flush: 'post' })
 
 const getPreviewPoint = (event: PointerEvent) => {
   const canvas = previewCanvas.value
@@ -229,8 +344,10 @@ const handlePreviewPointerMove = (event: PointerEvent) => {
   if (!state || state.pointerId !== event.pointerId) return
   const point = getPreviewPoint(event)
   imagePosition.value = {
-    x: state.imageX + point.x - state.startX,
-    y: state.imageY + point.y - state.startY,
+    ...clampImagePosition({
+      x: state.imageX + point.x - state.startX,
+      y: state.imageY + point.y - state.startY,
+    }),
   }
 }
 
@@ -245,6 +362,10 @@ const handlePreviewPointerUp = (event: PointerEvent) => {
 const render = async () => {
   if (!sourceFile.value || !sourceImage.value || !width.value || !height.value) {
     ElMessage.warning('请先选择图片并设置有效的分辨率')
+    return
+  }
+  if (isCanvasTooLarge.value) {
+    ElMessage.warning(`输出像素过大，请将宽高乘积控制在 ${MAX_CANVAS_PIXELS.toLocaleString()} 以内`)
     return
   }
 
@@ -277,8 +398,8 @@ const render = async () => {
 
     const blob = await canvasToBlob(canvas, outputType.value, quality.value / 100)
     downloadBlob(blob, replaceExtension(sourceFile.value.name, outputType.value))
-  } catch (error: any) {
-    ElMessage.error(error.message || '图片处理失败')
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '图片处理失败')
   } finally {
     processing.value = false
   }
@@ -301,7 +422,7 @@ onBeforeUnmount(() => {
         class="upload-drop-zone"
         drag
         :auto-upload="false"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         :show-file-list="false"
         :on-change="handleFileChange"
       >
@@ -317,9 +438,18 @@ onBeforeUnmount(() => {
       <div class="preview-card">
         <div
           class="preview-stage"
-          :class="{ draggable: mode === 'canvas' && canvasAlignment === 'custom' }"
+          :class="{
+            draggable: mode === 'canvas' && canvasAlignment === 'custom',
+          }"
         >
+          <img
+            v-if="showOriginalPreview"
+            class="original-preview"
+            :src="sourceUrl"
+            :alt="`${title}原图预览`"
+          />
           <canvas
+            v-else
             ref="previewCanvas"
             :aria-label="`${title}预览`"
             @pointerdown="handlePreviewPointerDown"
@@ -334,63 +464,151 @@ onBeforeUnmount(() => {
           <span>输出尺寸：{{ width }} × {{ height }}</span>
           <span>预览缩放：{{ previewScaleLabel }}</span>
           <span v-if="mode === 'canvas'">当前对齐：{{ currentAlignmentLabel }}</span>
+          <span v-if="jpegTransparencyHint" class="field-hint">
+            若原图含透明像素，JPG 会将透明区域填充为白色
+          </span>
         </div>
       </div>
 
       <div v-if="mode === 'canvas'" class="alignment-setting">
-        <span class="setting-label">原图对齐</span>
-        <div class="alignment-grid">
+        <div class="alignment-controls">
+          <div class="alignment-grid">
+            <button
+              v-for="option in alignmentOptions"
+              :key="option.value"
+              type="button"
+              :class="['alignment-button', { active: canvasAlignment === option.value }]"
+              :aria-label="option.label"
+              @click="selectAlignment(option.value)"
+            >
+              <component :is="option.icon" class="alignment-icon" />
+            </button>
+          </div>
           <button
-            v-for="option in alignmentOptions"
-            :key="option.value"
             type="button"
-            :class="['alignment-button', { active: canvasAlignment === option.value }]"
-            :aria-label="option.label"
-            @click="selectAlignment(option.value)"
+            class="custom-alignment-button"
+            :class="{ active: canvasAlignment === 'custom' }"
+            @click="selectAlignment('custom')"
           >
-            <component :is="option.icon" class="alignment-icon" />
+            自定义拖拽
           </button>
+          <el-form-item v-if="canvasAlignment === 'custom'" label="X 坐标" class="position-input">
+            <el-input-number
+              v-model="imagePosition.x"
+              :min="-20000"
+              :max="20000"
+              controls-position="right"
+              @change="normalizeCustomPosition"
+            />
+          </el-form-item>
+          <el-form-item v-if="canvasAlignment === 'custom'" label="Y 坐标" class="position-input">
+            <el-input-number
+              v-model="imagePosition.y"
+              :min="-20000"
+              :max="20000"
+              controls-position="right"
+              @change="normalizeCustomPosition"
+            />
+          </el-form-item>
         </div>
-        <span class="alignment-name">
-          {{ currentAlignmentLabel }}
-        </span>
         <button
           type="button"
-          class="custom-alignment-button"
-          :class="{ active: canvasAlignment === 'custom' }"
-          @click="selectAlignment('custom')"
+          class="canvas-bounds-button"
+          :class="{ active: constrainImageToCanvas }"
+          :aria-pressed="constrainImageToCanvas"
+          :disabled="imageWidth > width || imageHeight > height"
+          @click="toggleCanvasBounds(!constrainImageToCanvas)"
         >
-          自定义拖拽
+          将图片锁定在画布内
         </button>
       </div>
 
       <el-form class="settings" label-position="top">
-        <el-form-item label="目标宽度">
-          <el-input-number v-model="width" :min="1" :max="20000" controls-position="right" />
-        </el-form-item>
-        <el-form-item label="目标高度">
-          <el-input-number v-model="height" :min="1" :max="20000" controls-position="right" />
-        </el-form-item>
+        <div v-if="mode === 'image'" class="dimensions-row">
+          <el-form-item label="目标宽度">
+            <el-input-number
+              v-model="width"
+              :min="1"
+              :max="20000"
+              controls-position="right"
+              @input="handleDimensionChange('width', $event)"
+              @change="handleDimensionChange('width', $event)"
+            />
+          </el-form-item>
+          <AspectRatioToggle
+            :model-value="aspectRatioLocked"
+            @update:model-value="toggleAspectRatio"
+          />
+          <el-form-item label="目标高度">
+            <el-input-number
+              v-model="height"
+              :min="1"
+              :max="20000"
+              controls-position="right"
+              @input="handleDimensionChange('height', $event)"
+              @change="handleDimensionChange('height', $event)"
+            />
+          </el-form-item>
+        </div>
         <template v-if="mode === 'canvas'">
-          <el-form-item label="图片宽度">
-            <el-input-number
-              v-model="imageWidth"
-              :min="1"
-              :max="20000"
-              controls-position="right"
+          <div class="dimensions-row">
+            <el-form-item label="画布宽度">
+              <el-input-number
+                v-model="width"
+                :min="1"
+                :max="20000"
+                controls-position="right"
+                @input="handleDimensionChange('width', $event)"
+                @change="handleDimensionChange('width', $event)"
+              />
+            </el-form-item>
+            <AspectRatioToggle
+              :model-value="aspectRatioLocked"
+              label="画布宽高比例"
+              @update:model-value="toggleAspectRatio"
             />
-          </el-form-item>
-          <el-form-item label="图片高度">
-            <el-input-number
-              v-model="imageHeight"
-              :min="1"
-              :max="20000"
-              controls-position="right"
+            <el-form-item label="画布高度">
+              <el-input-number
+                v-model="height"
+                :min="1"
+                :max="20000"
+                controls-position="right"
+                @input="handleDimensionChange('height', $event)"
+                @change="handleDimensionChange('height', $event)"
+              />
+            </el-form-item>
+          </div>
+          <div class="dimensions-row">
+            <el-form-item label="图片宽度">
+              <el-input-number
+                v-model="imageWidth"
+                :min="1"
+                :max="20000"
+                controls-position="right"
+                @input="handleImageDimensionChange('width', $event)"
+                @change="handleImageDimensionChange('width', $event)"
+              />
+            </el-form-item>
+            <AspectRatioToggle
+              :model-value="imageAspectRatioLocked"
+              label="图片宽高比例"
+              @update:model-value="toggleImageAspectRatio"
             />
-          </el-form-item>
+            <el-form-item label="图片高度">
+              <el-input-number
+                v-model="imageHeight"
+                :min="1"
+                :max="20000"
+                controls-position="right"
+                @input="handleImageDimensionChange('height', $event)"
+                @change="handleImageDimensionChange('height', $event)"
+              />
+            </el-form-item>
+          </div>
         </template>
         <el-form-item :label="`压缩质量（${quality}%）`">
-          <el-slider v-model="quality" :min="1" :max="100" />
+          <el-slider v-model="quality" :min="1" :max="100" :disabled="qualityDisabled" />
+          <small v-if="qualityDisabled" class="field-hint">PNG 输出不使用质量参数</small>
         </el-form-item>
         <el-form-item label="输出格式">
           <el-select v-model="outputType">
@@ -405,6 +623,9 @@ onBeforeUnmount(() => {
       </el-form>
 
       <div class="actions">
+        <el-button @click="showOriginalPreview = !showOriginalPreview">
+          {{ showOriginalPreview ? '查看处理预览' : '查看原图' }}
+        </el-button>
         <el-button type="primary" :loading="processing" @click="render">
           导出 {{ outputLabel }}
         </el-button>
@@ -416,12 +637,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .resolution-tool {
-  width: 90%;
+  width: min(100% - 40px, 1120px);
   max-width: 1200px;
-  margin: 0 auto 40px;
+  margin: 0 auto 48px;
 }
 .heading {
-  margin: 28px 0 20px;
+  margin: 32px 0 24px;
   text-align: center;
 }
 .heading h2 {
@@ -433,11 +654,15 @@ onBeforeUnmount(() => {
   color: #909399;
 }
 .upload-section {
-  padding: 2rem;
+  padding: 28px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color);
 }
 .upload-drop-zone {
   border: 2px dashed #e5e5e5;
-  padding: 3rem 1rem;
+  padding: 48px 16px;
+  border-radius: 10px;
 }
 .upload-icon {
   font-size: 3rem;
@@ -452,13 +677,16 @@ onBeforeUnmount(() => {
   color: #909399;
 }
 .preview-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
   align-items: center;
-  gap: 20px;
-  min-height: 220px;
-  padding: 20px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  gap: 24px;
+  min-height: 260px;
+  padding: 24px;
+  border: 1px solid var(--el-border-color-lighter);
+  background: var(--el-bg-color);
+  border-radius: 12px;
+  box-shadow: var(--el-box-shadow-light);
 }
 .preview-card img {
   max-width: 360px;
@@ -466,12 +694,13 @@ onBeforeUnmount(() => {
   object-fit: contain;
 }
 .preview-stage {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  max-width: 720px;
+  justify-self: start;
+  width: fit-content;
+  max-width: 760px;
   min-width: 0;
-  min-height: 120px;
   overflow: auto;
   background-color: #f0f2f5;
   background-image:
@@ -487,6 +716,12 @@ onBeforeUnmount(() => {
   max-width: 100%;
   height: auto;
 }
+.preview-stage .original-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
 .preview-stage.draggable canvas {
   cursor: grab;
 }
@@ -496,12 +731,43 @@ onBeforeUnmount(() => {
 .alignment-setting {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 20px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  background: var(--el-fill-color-lighter);
 }
-.setting-label {
-  flex: 0 0 auto;
-  color: #606266;
+.alignment-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.canvas-bounds-button {
+  margin-left: auto;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  color: var(--el-text-color-regular);
+  background: var(--el-bg-color);
+  cursor: pointer;
+}
+.canvas-bounds-button:hover:not(:disabled) {
+  border-color: var(--el-color-primary);
+  color: var(--el-color-primary);
+}
+.canvas-bounds-button.active {
+  border-color: var(--el-color-primary);
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+.canvas-bounds-button:disabled {
+  color: var(--el-text-color-disabled);
+  background: var(--el-fill-color-light);
+  cursor: not-allowed;
 }
 .alignment-grid {
   display: grid;
@@ -532,9 +798,6 @@ onBeforeUnmount(() => {
 .alignment-grid button.active .alignment-icon {
   color: var(--el-color-primary);
 }
-.alignment-name {
-  color: #909399;
-}
 .custom-alignment-button {
   padding: 4px 10px;
   border: 1px solid #dcdfe6;
@@ -560,33 +823,87 @@ onBeforeUnmount(() => {
 .settings {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 24px;
+  gap: 8px 40px;
+  margin-top: 20px;
+  padding: 20px 24px 8px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  background: var(--el-bg-color);
 }
 .settings :deep(.el-input-number),
 .settings :deep(.el-select) {
   width: 100%;
 }
+.dimensions-row {
+  position: relative;
+  display: grid;
+  grid-column: span 2;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 40px;
+  align-self: start;
+  margin-bottom: 18px;
+}
+.dimensions-row :deep(.el-form-item) {
+  min-width: 0;
+  margin-bottom: 0;
+}
+.position-input {
+  width: 160px;
+  margin: 0;
+}
+.position-input :deep(.el-input-number) {
+  width: 100%;
+}
+.field-hint {
+  color: #909399;
+  font-size: 12px;
+}
 .actions {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 20px;
 }
 @media (max-width: 760px) {
+  .resolution-tool {
+    width: min(100% - 24px, 1120px);
+  }
   .settings {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .dimensions-row {
+    grid-column: 1 / -1;
+  }
   .preview-card {
-    align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
   }
-  .preview-card img {
-    max-width: 100%;
+  .preview-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 12px;
   }
+  .preview-meta strong { grid-column: 1 / -1; }
   .alignment-setting {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 14px;
+  }
+  .settings {
+    padding: 16px 14px 4px;
+  }
+}
+@media (max-width: 420px) {
+  .settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dimensions-row {
+    grid-column: span 1;
+    column-gap: 40px;
+  }
+  .preview-meta {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>
