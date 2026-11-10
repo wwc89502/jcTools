@@ -368,12 +368,6 @@ const getStatusType = (status: FileStatus) => {
         </el-form>
 
         <div class="action-buttons">
-          <el-button type="primary" @click="compressAll" :loading="compressing">
-            {{ compressing ? `压缩中 ${compressProgress}%` : '开始压缩' }}
-          </el-button>
-          <span v-if="compressing && currentFileName" class="progress-name">
-            正在处理 {{ currentFileIndex }}/{{ processingTotal }}：{{ currentFileName }}
-          </span>
           <el-select
             v-model="compressionSettings.fileType"
             placeholder="同时转换格式"
@@ -386,6 +380,12 @@ const getStatusType = (status: FileStatus) => {
               :value="item"
             ></el-option>
           </el-select>
+          <el-button type="primary" @click="compressAll" :loading="compressing">
+            {{ compressing ? `压缩中 ${compressProgress}%` : '开始压缩' }}
+          </el-button>
+          <span v-if="compressing && currentFileName" class="progress-name">
+            正在处理 {{ currentFileIndex }}/{{ processingTotal }}：{{ currentFileName }}
+          </span>
           <el-button :disabled="compressing" @click="resetFiles">重新选择</el-button>
           <el-button
             type="success"
