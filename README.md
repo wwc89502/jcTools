@@ -43,6 +43,8 @@ npm run preview
 
 生产文件输出到 `dist/` 目录。当前页面托管在 Cloudflare，构建命令为 `npm run build`，构建输出目录为 `dist`。项目使用 Hash 路由。
 
+推送 `v` 开头的 Git tag（例如 `v1.0.0`）会通过 GitHub Actions 构建并部署到 Cloudflare Workers。首次启用前，在 GitHub 仓库 Actions secrets 中添加 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，并在 Cloudflare Worker 的 **Settings → Builds** 中断开原有 Git 集成，避免普通分支推送也触发部署。
+
 ## 技术栈
 
 - Vue 3 + TypeScript
