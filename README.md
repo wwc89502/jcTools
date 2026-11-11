@@ -2,6 +2,8 @@
 
 一个面向日常图片处理的轻量级 Web 工具集，使用 Vue 3、Vite 和 Element Plus 构建。
 
+在线预览：[jcTools](https://jctools.wwc89502.workers.dev/#/)
+
 ## 功能
 
 - **单图画布调整**：修改画布宽高，使用九宫格或“自定义拖拽”调整原图位置，补充区域保持透明，并支持图片大小调整。
@@ -37,12 +39,9 @@ npm run build
 
 # 预览生产构建
 npm run preview
-
-# 构建并发布到 GitHub Pages
-npm run deploy
 ```
 
-生产文件输出到 `docs/` 目录。项目使用 Hash 路由，适合部署到静态托管服务。
+生产文件输出到 `dist/` 目录。当前页面托管在 Cloudflare，构建命令为 `npm run build`，构建输出目录为 `dist`。项目使用 Hash 路由。
 
 ## 技术栈
 
