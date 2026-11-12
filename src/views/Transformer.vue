@@ -3,10 +3,15 @@ import { computed, ref, watch } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import JSZip from 'jszip'
-import { isSupportedImageFile, loadImage } from '@/utils/image-export'
+import {
+  canvasToBlob,
+  imageOutputTypes,
+  isSupportedImageFile,
+  loadImage,
+  type ImageOutputType,
+} from '@/utils/image-export'
 
 interface CompressionSettings {
-  quality: number
   fileType: string
 }
 
@@ -15,7 +20,6 @@ interface UploadChangeFile {
 }
 
 const compressionSettings = ref<CompressionSettings>({
-  quality: 90,
   fileType: '',
 })
 
@@ -50,28 +54,16 @@ const compressImage = async (file: File): Promise<Blob> => {
     const context = canvas.getContext('2d')
     if (!context) throw new Error('当前浏览器不支持图片处理')
 
-    const outputType = compressionSettings.value.fileType || file.type || 'image/png'
+    const requestedType = compressionSettings.value.fileType || file.type || 'image/png'
+    const outputType = imageOutputTypes.includes(requestedType as ImageOutputType)
+      ? (requestedType as ImageOutputType)
+      : 'image/png'
     if (outputType === 'image/jpeg') {
       context.fillStyle = '#fff'
       context.fillRect(0, 0, canvas.width, canvas.height)
     }
     context.drawImage(loaded.image, 0, 0)
-    const requestedType = compressionSettings.value.fileType
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error('图片导出失败'))
-          } else if (requestedType && blob.type !== requestedType) {
-            reject(new Error(`当前浏览器无法输出 ${requestedType.split('/')[1].toUpperCase()} 格式`))
-          } else {
-            resolve(blob)
-          }
-        },
-        outputType,
-        compressionSettings.value.quality / 100,
-      )
-    })
+    return await canvasToBlob(canvas, outputType)
   } finally {
     URL.revokeObjectURL(loaded.url)
   }
@@ -99,6 +91,11 @@ const selectableFiles = computed(() => files.value.filter((file) => file.compres
 const selectedFiles = computed(() =>
   files.value.filter((file) => file.selected && file.compressedBlob),
 )
+const usesWebpOutput = computed(
+  () =>
+    compressionSettings.value.fileType === 'image/webp' ||
+    (!compressionSettings.value.fileType && files.value.some((file) => file.type === 'image/webp')),
+)
 const allSelected = computed(
   () => selectableFiles.value.length > 0 && selectedFiles.value.length === selectableFiles.value.length,
 )
@@ -107,7 +104,7 @@ const selectionIndeterminate = computed(
 )
 
 watch(
-  () => [compressionSettings.value.quality, compressionSettings.value.fileType],
+  () => [compressionSettings.value.fileType],
   () => {
     if (compressing.value) return
     files.value.forEach((file) => {
@@ -357,14 +354,6 @@ const getStatusType = (status: FileStatus) => {
       <!-- 压缩设置 -->
       <div class="compression-controls">
         <el-form :model="compressionSettings" label-position="top">
-          <el-form-item :label="`压缩质量 (${compressionSettings.quality}%)`">
-            <el-slider
-              v-model="compressionSettings.quality"
-              :min="1"
-              :max="100"
-              :disabled="compressing"
-            />
-          </el-form-item>
         </el-form>
 
         <div class="action-buttons">

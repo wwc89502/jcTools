@@ -21,6 +21,7 @@ import {
   isSupportedImageFile,
   imageOutputTypes,
   loadImage,
+  resizeImageData,
   replaceExtension,
   type ImageOutputType,
 } from '@/utils/image-export'
@@ -33,7 +34,6 @@ const sourceImage = ref<HTMLImageElement>()
 const sourceUrl = ref('')
 const width = ref(0)
 const height = ref(0)
-const quality = ref(90)
 const outputType = ref<ImageOutputType>('image/jpeg')
 const processing = ref(false)
 const previewCanvas = ref<HTMLCanvasElement>()
@@ -73,7 +73,6 @@ const previewScale = computed(() => {
   return Math.min(1, 720 / width.value, 480 / height.value)
 })
 const previewScaleLabel = computed(() => `${Math.round(previewScale.value * 100)}%`)
-const qualityDisabled = computed(() => outputType.value === 'image/png')
 const jpegTransparencyHint = computed(() => outputType.value === 'image/jpeg' && !!sourceImage.value)
 const aspectRatio = computed(() =>
   sourceImage.value?.naturalWidth && sourceImage.value?.naturalHeight
@@ -359,6 +358,46 @@ const handlePreviewPointerUp = (event: PointerEvent) => {
   dragState.value = undefined
 }
 
+const drawImageAtSize = async (
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) => {
+  const targetWidth = Math.max(1, Math.round(width))
+  const targetHeight = Math.max(1, Math.round(height))
+  if (targetWidth === image.naturalWidth && targetHeight === image.naturalHeight) {
+    context.drawImage(image, x, y)
+    return
+  }
+  if (image.naturalWidth * image.naturalHeight > MAX_CANVAS_PIXELS) {
+    context.drawImage(image, x, y, targetWidth, targetHeight)
+    return
+  }
+
+  const sourceCanvas = document.createElement('canvas')
+  sourceCanvas.width = image.naturalWidth
+  sourceCanvas.height = image.naturalHeight
+  const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true })
+  if (!sourceContext) throw new Error('当前浏览器不支持图片缩放')
+  sourceContext.drawImage(image, 0, 0)
+  const imageData = await resizeImageData(
+    sourceContext.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height),
+    targetWidth,
+    targetHeight,
+  )
+
+  const resizedCanvas = document.createElement('canvas')
+  resizedCanvas.width = targetWidth
+  resizedCanvas.height = targetHeight
+  const resizedContext = resizedCanvas.getContext('2d')
+  if (!resizedContext) throw new Error('当前浏览器不支持图片缩放')
+  resizedContext.putImageData(imageData, 0, 0)
+  context.drawImage(resizedCanvas, x, y)
+}
+
 const render = async () => {
   if (!sourceFile.value || !sourceImage.value || !width.value || !height.value) {
     ElMessage.warning('请先选择图片并设置有效的分辨率')
@@ -385,7 +424,8 @@ const render = async () => {
     if (props.mode === 'canvas') {
       const imageSize = getCanvasImageSize()
       const placement = getImagePlacement()
-      context.drawImage(
+      await drawImageAtSize(
+        context,
         sourceImage.value,
         placement.x,
         placement.y,
@@ -393,10 +433,10 @@ const render = async () => {
         imageSize.height,
       )
     } else {
-      context.drawImage(sourceImage.value, 0, 0, canvas.width, canvas.height)
+      await drawImageAtSize(context, sourceImage.value, 0, 0, canvas.width, canvas.height)
     }
 
-    const blob = await canvasToBlob(canvas, outputType.value, quality.value / 100)
+    const blob = await canvasToBlob(canvas, outputType.value)
     downloadBlob(blob, replaceExtension(sourceFile.value.name, outputType.value))
   } catch (error: unknown) {
     ElMessage.error(error instanceof Error ? error.message : '图片处理失败')
@@ -606,10 +646,6 @@ onBeforeUnmount(() => {
             </el-form-item>
           </div>
         </template>
-        <el-form-item :label="`压缩质量（${quality}%）`">
-          <el-slider v-model="quality" :min="1" :max="100" :disabled="qualityDisabled" />
-          <small v-if="qualityDisabled" class="field-hint">PNG 输出不使用质量参数</small>
-        </el-form-item>
         <el-form-item label="输出格式">
           <el-select v-model="outputType">
             <el-option

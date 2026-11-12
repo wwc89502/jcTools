@@ -8,6 +8,18 @@ dependencies:
   '@element-plus/icons-vue':
     specifier: ^2.3.2
     version: 2.3.2(vue@3.5.45)
+  '@jsquash/jpeg':
+    specifier: ^1.6.0
+    version: 1.6.0
+  '@jsquash/oxipng':
+    specifier: ^2.3.0
+    version: 2.3.0
+  '@jsquash/resize':
+    specifier: ^2.1.1
+    version: 2.1.1
+  '@jsquash/webp':
+    specifier: ^1.5.0
+    version: 1.5.0
   element-plus:
     specifier: ^2.14.8
     version: 2.14.8(vue@3.5.45)
@@ -552,6 +564,26 @@ packages:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  /@jsquash/jpeg@1.6.0:
+    resolution: {integrity: sha512-zwN46Awh1VM6gXlIcALwb5WzqK5H2e6+Awcs1QP8AvS8ohsK/sbE4esvmH4jhlhW7+CgiUUww66vg0aTnlSIMA==}
+    dev: false
+
+  /@jsquash/oxipng@2.3.0:
+    resolution: {integrity: sha512-aQ8wiEp6ztlTMXc+RMt/CG8crU3mEHDU+h+JYkIi6ctMhlh8+Ltj5XwQFfBuyzKYrp8NxaFW80Dp824bqjr+zA==}
+    dependencies:
+      wasm-feature-detect: 1.10.0
+    dev: false
+
+  /@jsquash/resize@2.1.1:
+    resolution: {integrity: sha512-0R5UL1ZLHUT+carjVikcE1QfA+kfNQ2YamYyGVRmhfh4zttU5EY3bQBGxPIPtY2xIAw1P4Kgyxm2xrceRw1r2w==}
+    dev: false
+
+  /@jsquash/webp@1.5.0:
+    resolution: {integrity: sha512-KggLoj2MnRSfIqTeKe1EmbljTX2vuV7mh79k89PCL1pyqiDULcPM1L47twxXt0hkb68F70bXiL31MxsuoZtKFw==}
+    dependencies:
+      wasm-feature-detect: 1.10.0
+    dev: false
 
   /@malept/cross-spawn-promise@2.0.0:
     resolution: {integrity: sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg==}
@@ -2530,6 +2562,10 @@ packages:
       '@vue/server-renderer': 3.5.45
       '@vue/shared': 3.5.45
       typescript: 6.0.3
+
+  /wasm-feature-detect@1.10.0:
+    resolution: {integrity: sha512-u0tkTCCo8s7xa9UoE2rtZGRYXTSqYx3kRPJ2XkbyYl2AbnMggSFmYNiJIispzzCPz7SIFTBTPTk0nI8yXwJgvA==}
+    dev: false
 
   /webpack-virtual-modules@0.6.2:
     resolution: {integrity: sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==}
